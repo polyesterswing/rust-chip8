@@ -2,6 +2,8 @@ use std::io::prelude::*;
 use std::io;
 use std::fs::File;
 
+use std::time::{Instant, Duration};
+
 pub struct Chip8 {
     pub ram: [u8; 4096],
     pub vmem: [bool; 64 * 32],
@@ -10,6 +12,8 @@ pub struct Chip8 {
     pub I: u16,
     pub stack: Vec<u16>,
     pub fonts: [u8; 80],
+    pub delay_timer_last_access: std::time::Instant,
+    pub delay_timer_value: u8,
 }
 
 #[derive(Debug)]
@@ -29,6 +33,8 @@ pub enum Instruction {
     AND {s: u8, t: u8},
     BCD {s: u8},
     READ {s: u8},
+    MOVED {t: u8},
+    LOADD {s: u8},
 }
 
 impl Chip8 {
@@ -58,6 +64,8 @@ impl Chip8 {
                 0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
                 0xF0, 0x80, 0xF0, 0x80, 0x80, // F
             ],
+            delay_timer_last_access: Instant::now(),
+            delay_timer_value: 0,
 
         };
 
@@ -86,9 +94,11 @@ impl Chip8 {
             0xA => Some(Instruction::LOADI {nnn: (opcode & 0x0FFF)}),
             0xD => Some(Instruction::DRAW  {x: ((opcode & 0x0F00) >> 8) as u8, y: ((opcode & 0x00F0) >> 4) as u8, n: (opcode & 0x000F) as u8}),
             0xF => match opcode & 0x00FF {
+                0x15 => Some(Instruction::LOADD {s: ((opcode & 0x0F00) >> 8) as u8}),
                 0x29 => Some(Instruction::LDSPR {x: ((opcode & 0x0F00) >> 8) as u8}),
-                0x33 => Some(Instruction::BCD {s: ((opcode & 0x0F00) >> 8) as u8}),
-                0x65 => Some(Instruction::READ {s: ((opcode & 0x0F00) >> 8) as u8}),
+                0x33 => Some(Instruction::BCD   {s: ((opcode & 0x0F00) >> 8) as u8}),
+                0x65 => Some(Instruction::READ  {s: ((opcode & 0x0F00) >> 8) as u8}),
+                0x07 => Some(Instruction::MOVED {t: ((opcode & 0x0F00) >> 8) as u8}),
                 _ => None,
             }
             _ => None,
@@ -121,7 +131,7 @@ impl Chip8 {
                 }
             },
             Instruction::ADD {s, nn} => {
-                self.regs[s as usize] += nn
+                self.regs[s as usize] = self.regs[s as usize].wrapping_add(nn);
             },
             Instruction::AND {s, t} => {
                 self.regs[s as usize] = self.regs[s as usize] & self.regs[t as usize];
@@ -137,7 +147,6 @@ impl Chip8 {
                         // Compare with 0 instead of casting to bool, sus lang
                         self.vmem[((x + (7 - i)) + 64 * (y + j as usize))] ^= ((self.ram[(self.I + j as u16) as usize] >> i) & 0x01) != 0;
                     }
-;
                 }
 
                 for y in 0..32 {
@@ -150,7 +159,7 @@ impl Chip8 {
             },
             Instruction::LDSPR {x} => {
                 let chr = self.regs[x as usize];
-                self.I = (chr * 0x4) as u16;
+                self.I = (chr * 0x5) as u16;
             },
             Instruction::BCD {s} => {
                 let x = self.regs[s as usize];
@@ -160,7 +169,21 @@ impl Chip8 {
                 }
             },
             Instruction::READ {s} => {
-                println!("FINISH THE READ INSTRUCTION");
+                for i in 0..=s {
+                    self.regs[i as usize] = self.ram[(self.I + i as u16) as usize];
+                }
+            },
+            Instruction::MOVED {t} => {
+                let to_decrease = (self.delay_timer_last_access.elapsed().as_secs() as f32 / (0.167)) as u8;
+                self.delay_timer_value = if {self.delay_timer_value as i8 - to_decrease as i8} >= 0 {self.delay_timer_value - to_decrease} else {0};
+                println!("{}", self.delay_timer_value);
+                self.regs[t as usize] = self.delay_timer_value;
+            },
+            Instruction::LOADD {s} => {
+                self.delay_timer_last_access = Instant::now();
+                println!("{:?}", self.delay_timer_last_access);
+                self.delay_timer_value = self.regs[s as usize];
+                println!("{}", self.delay_timer_value);
             },
             _ => println!("This instruction has not been implemented"),
         };
@@ -176,7 +199,7 @@ impl Chip8 {
 
     pub fn load_program(&mut self)
     {
-        let mut file = File::open("GAMES/PONG").unwrap();
+        let mut file = File::open("GAMES/15PUZZLE").unwrap();
         file.read(&mut self.ram[0x200..]).unwrap();
     }
 

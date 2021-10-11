@@ -28,6 +28,7 @@ pub enum Instruction {
     LOAD  {s: u8, nn: u8},
     ADD   {s: u8, nn: u8},
     LOADI {nnn: u16},
+    ADDI  {s: u8},
     DRAW  {x: u8, y: u8, n: u8},
     LDSPR {x: u8},
     AND {s: u8, t: u8},
@@ -95,6 +96,7 @@ impl Chip8 {
             0xD => Some(Instruction::DRAW  {x: ((opcode & 0x0F00) >> 8) as u8, y: ((opcode & 0x00F0) >> 4) as u8, n: (opcode & 0x000F) as u8}),
             0xF => match opcode & 0x00FF {
                 0x15 => Some(Instruction::LOADD {s: ((opcode & 0x0F00) >> 8) as u8}),
+                0x1E => Some(Instruction::ADDI  {s: ((opcode & 0x0F00) >> 8) as u8}),
                 0x29 => Some(Instruction::LDSPR {x: ((opcode & 0x0F00) >> 8) as u8}),
                 0x33 => Some(Instruction::BCD   {s: ((opcode & 0x0F00) >> 8) as u8}),
                 0x65 => Some(Instruction::READ  {s: ((opcode & 0x0F00) >> 8) as u8}),
@@ -176,14 +178,14 @@ impl Chip8 {
             Instruction::MOVED {t} => {
                 let to_decrease = (self.delay_timer_last_access.elapsed().as_secs() as f32 / (0.167)) as u8;
                 self.delay_timer_value = if {self.delay_timer_value as i8 - to_decrease as i8} >= 0 {self.delay_timer_value - to_decrease} else {0};
-                println!("{}", self.delay_timer_value);
                 self.regs[t as usize] = self.delay_timer_value;
             },
             Instruction::LOADD {s} => {
                 self.delay_timer_last_access = Instant::now();
-                println!("{:?}", self.delay_timer_last_access);
                 self.delay_timer_value = self.regs[s as usize];
-                println!("{}", self.delay_timer_value);
+            },
+            Instruction::ADDI {s} => {
+                self.I += self.regs[s as usize] as u16;
             },
             _ => println!("This instruction has not been implemented"),
         };

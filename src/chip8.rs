@@ -12,7 +12,7 @@ pub struct Chip8 {
     pub I: u16,
     pub stack: Vec<u16>,
     pub fonts: [u8; 80],
-    pub delay_timer_last_access: std::time::Instant,
+    pub delay_timer_last_access: Instant,
     pub delay_timer_value: u8,
 }
 
@@ -153,9 +153,9 @@ impl Chip8 {
 
                 for y in 0..32 {
                     for x in 0..64 {
-                        print!("{}", self.vmem[x + 64 * y] as u8);
+                        // print!("{}", self.vmem[x + 64 * y] as u8);
                     }
-                    print!("\n");
+                    // print!("\n");
                 }
 
             },
@@ -176,6 +176,7 @@ impl Chip8 {
                 }
             },
             Instruction::MOVED {t} => {
+                // 0.167 is 1/60
                 let to_decrease = (self.delay_timer_last_access.elapsed().as_secs() as f32 / (0.167)) as u8;
                 self.delay_timer_value = if {self.delay_timer_value as i8 - to_decrease as i8} >= 0 {self.delay_timer_value - to_decrease} else {0};
                 self.regs[t as usize] = self.delay_timer_value;
@@ -208,16 +209,16 @@ impl Chip8 {
     pub fn cycle(&mut self)
     {
         let instruction = self.fetch();
-        println!("{:X}", instruction);
+        // println!("{:X}", instruction);
         let decoded = Chip8::decode(instruction);
 
         match decoded {
             Some(i) => self.execute(i),
-            None => println!("Ee instruction inikki ariyilla"),
+            None => (), // println!("Ee instruction inikki ariyilla"),
         }
 
-        let mut s = String::new();
-        io::stdin().read_line(&mut s).unwrap();
+//        let mut s = String::new();
+//        io::stdin().read_line(&mut s).unwrap();
     }
 
 }

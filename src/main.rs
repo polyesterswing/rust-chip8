@@ -4,10 +4,28 @@ use chip8::Chip8;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::rect::Rect;
 
 fn main() {
     let mut chip8 = Chip8::new();
+
+    let keys = [
+        Some(Keycode::Num0),
+        Some(Keycode::Num1),
+        Some(Keycode::Num2),
+        Some(Keycode::Num3),
+        Some(Keycode::Num4),
+        Some(Keycode::Num5),
+        Some(Keycode::Num6),
+        Some(Keycode::Num7),
+        Some(Keycode::Num8),
+        Some(Keycode::Num9),
+        Some(Keycode::A),
+        Some(Keycode::B),
+        Some(Keycode::C),
+        Some(Keycode::D),
+        Some(Keycode::E),
+        Some(Keycode::F),
+    ];
 
     chip8.load_program();
 
@@ -51,16 +69,15 @@ fn main() {
         ).unwrap();
 
         canvas.clear();
-        canvas.copy(&texture, None, Some(Rect::new(100, 100, 64, 32))).unwrap();
+        canvas.copy(&texture, None, None).unwrap();
         canvas.present();
 
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
+                Event::Quit { .. } => break 'running,
+                Event::KeyDown {keycode, ..} => {
+                    ()
+                },
                 _ => {}
             }
         }

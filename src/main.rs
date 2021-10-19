@@ -33,7 +33,7 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
 
     let window = video_subsystem
-        .window("Chip8 Emulator", 800, 600)
+        .window("Chip8 Emulator", 1280, 640)
         .position_centered()
         .build()
         .unwrap();

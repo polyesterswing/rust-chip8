@@ -1,8 +1,10 @@
+extern crate rand;
+
 use std::io::prelude::*;
 use std::io;
 use std::fs::File;
 
-use std::time::{Instant, Duration};
+use std::time::Instant;
 
 pub struct Chip8 {
     pub ram: [u8; 4096],
@@ -31,11 +33,19 @@ pub enum Instruction {
     ADDI  {s: u8},
     DRAW  {x: u8, y: u8, n: u8},
     LDSPR {x: u8},
-    AND {s: u8, t: u8},
-    BCD {s: u8},
-    READ {s: u8},
+    OR    {s: u8, t: u8},
+    AND   {s: u8, t: u8},
+    XOR   {s: u8, t: u8},
+    ADDR  {s: u8, t: u8},
+    SUB   {s: u8, t: u8},
+    SHR   {s: u8, t: u8},
+    SHL   {s: u8, t: u8},
+    BCD   {s: u8},
+    READ  {s: u8},
     MOVED {t: u8},
     LOADD {s: u8},
+    RAND  {t: u8, nn: u8},
+    SKUP  {s: u8},
 }
 
 impl Chip8 {
@@ -89,11 +99,19 @@ impl Chip8 {
             0x6 => Some(Instruction::LOAD  {s: ((opcode & 0x0F00) >> 8) as u8, nn: (opcode & 0x00FF) as u8}),
             0x7 => Some(Instruction::ADD   {s: ((opcode & 0x0F00) >> 8) as u8, nn: (opcode & 0x00FF) as u8}),
             0x8 => match opcode & 0x000F {
-                0x2 => Some(Instruction::AND {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x1 => Some(Instruction::OR   {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x2 => Some(Instruction::AND  {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x3 => Some(Instruction::XOR  {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x4 => Some(Instruction::ADDR {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x5 => Some(Instruction::SUB  {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0x6 => Some(Instruction::SHR  {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
+                0xE => Some(Instruction::SHL  {s: ((opcode & 0x0F00) >> 8) as u8, t: ((opcode & 0x00F0) >> 4) as u8}),
                 _ => None,
             }
             0xA => Some(Instruction::LOADI {nnn: (opcode & 0x0FFF)}),
+            0xC => Some(Instruction::RAND  {t: ((opcode & 0x0F00) >> 8) as u8, nn: (opcode & 0x00FF) as u8}),
             0xD => Some(Instruction::DRAW  {x: ((opcode & 0x0F00) >> 8) as u8, y: ((opcode & 0x00F0) >> 4) as u8, n: (opcode & 0x000F) as u8}),
+            0xE => Some(Instruction::SKUP  {s: ((opcode & 0x0F00) >> 8) as u8}),
             0xF => match opcode & 0x00FF {
                 0x15 => Some(Instruction::LOADD {s: ((opcode & 0x0F00) >> 8) as u8}),
                 0x1E => Some(Instruction::ADDI  {s: ((opcode & 0x0F00) >> 8) as u8}),
@@ -135,12 +153,26 @@ impl Chip8 {
             Instruction::ADD {s, nn} => {
                 self.regs[s as usize] = self.regs[s as usize].wrapping_add(nn);
             },
+            Instruction::OR {s, t} => {
+                self.regs[s as usize] = self.regs[s as usize] | self.regs[t as usize];
+            },
             Instruction::AND {s, t} => {
                 self.regs[s as usize] = self.regs[s as usize] & self.regs[t as usize];
             },
+            Instruction::XOR {s, t} => {
+                self.regs[s as usize] = self.regs[s as usize] ^ self.regs[t as usize];
+            },
+            Instruction::ADDR {s, t} =>{
+                let result = self.regs[s as usize].overflowing_add(self.regs[t as usize]);
+                self.regs[s as usize] = result.0;
+                if result.1 {
+                    self.regs[0xF] = 1;
+                } else if !result.1{
+                    self.regs[0xF] = 0;
+                }
+            },
             Instruction::LOAD {s, nn} => self.regs[s as usize] = nn,
-            Instruction::LOADI {nnn} => self.I = nnn,
-            Instruction::DRAW {x, y, n} => {
+            Instruction::LOADI {nnn} => self.I = nnn, Instruction::DRAW {x, y, n} => {
                 let x: usize = (self.regs[x as usize] - 1).into(); 
                 let y: usize = (self.regs[y as usize] + 1).into();
 
@@ -153,9 +185,9 @@ impl Chip8 {
 
                 for y in 0..32 {
                     for x in 0..64 {
-                        // print!("{}", self.vmem[x + 64 * y] as u8);
+                        print!("{}", self.vmem[x + 64 * y] as u8);
                     }
-                    // print!("\n");
+                    print!("\n");
                 }
 
             },
@@ -188,6 +220,12 @@ impl Chip8 {
             Instruction::ADDI {s} => {
                 self.I += self.regs[s as usize] as u16;
             },
+            Instruction::RAND {t, nn} => {
+                self.regs[t as usize] = rand::random::<u8>() & nn;
+            },
+            Instruction::SKUP {s} => {
+                println!("Implement SKUP");
+            },
             _ => println!("This instruction has not been implemented"),
         };
     }
@@ -209,16 +247,16 @@ impl Chip8 {
     pub fn cycle(&mut self)
     {
         let instruction = self.fetch();
-        // println!("{:X}", instruction);
+        println!("{:X}", instruction);
         let decoded = Chip8::decode(instruction);
 
         match decoded {
             Some(i) => self.execute(i),
-            None => (), // println!("Ee instruction inikki ariyilla"),
+            None =>  println!("Ee instruction inikki ariyilla"),
         }
 
-//        let mut s = String::new();
-//        io::stdin().read_line(&mut s).unwrap();
+       // let mut s = String::new();
+       // io::stdin().read_line(&mut s).unwrap();
     }
 
 }

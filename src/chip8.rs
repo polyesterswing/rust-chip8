@@ -183,7 +183,6 @@ impl Chip8 {
                         self.vmem[( ((x + (7 - i)) + 64 * (y + j as usize)) ) % 2048] ^= ((self.ram[(self.I + j as u16) as usize] >> i) & 0x01) != 0;
                     }
                 }
-                }
 
             },
             Instruction::LDSPR {x} => {

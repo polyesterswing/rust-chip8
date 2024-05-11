@@ -172,22 +172,17 @@ impl Chip8 {
                 }
             },
             Instruction::LOAD {s, nn} => self.regs[s as usize] = nn,
-            Instruction::LOADI {nnn} => self.I = nnn, Instruction::DRAW {x, y, n} => {
+            Instruction::LOADI {nnn} => self.I = nnn,
+            Instruction::DRAW {x, y, n} => {
                 let x: usize = (self.regs[x as usize] - 1).into(); 
                 let y: usize = (self.regs[y as usize] + 1).into();
 
                 for j in 0..n {
                     for i in (0..8).rev() {
                         // Compare with 0 instead of casting to bool, sus lang
-                        self.vmem[((x + (7 - i)) + 64 * (y + j as usize))] ^= ((self.ram[(self.I + j as u16) as usize] >> i) & 0x01) != 0;
+                        self.vmem[( ((x + (7 - i)) + 64 * (y + j as usize)) ) % 2048] ^= ((self.ram[(self.I + j as u16) as usize] >> i) & 0x01) != 0;
                     }
                 }
-
-                for y in 0..32 {
-                    for x in 0..64 {
-                        print!("{}", self.vmem[x + 64 * y] as u8);
-                    }
-                    print!("\n");
                 }
 
             },
@@ -238,9 +233,9 @@ impl Chip8 {
         return instruction;
     }
 
-    pub fn load_program(&mut self)
+    pub fn load_program(&mut self, file_name: &str)
     {
-        let mut file = File::open("GAMES/15PUZZLE").unwrap();
+        let mut file = File::open(file_name).unwrap();
         file.read(&mut self.ram[0x200..]).unwrap();
     }
 
@@ -252,11 +247,9 @@ impl Chip8 {
 
         match decoded {
             Some(i) => self.execute(i),
-            None =>  println!("Ee instruction inikki ariyilla"),
+            None =>  println!("Unknown Instruction"),
         }
 
-       // let mut s = String::new();
-       // io::stdin().read_line(&mut s).unwrap();
     }
 
 }

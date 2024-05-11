@@ -27,7 +27,7 @@ fn main() {
         Some(Keycode::F),
     ];
 
-    chip8.load_program();
+    chip8.load_program("GAMES/PONG");
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
